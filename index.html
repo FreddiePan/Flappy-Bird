@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Title</title>
+</head>
+<body>
+<canvas id='cv'></canvas>
+<!--引入Fly全局对象-->
+<script src='./js/Fly.js'></script>
+<!--引入小鸟js-->
+<script src='./js/bird.js'></script>
+<!--引入天空-->
+<script src='./js/sky.js'></script>
+<!--引入管道-->
+<script src='./js/pipe.js'></script>
+<!--引入陆地-->
+<script src='./js/land.js'></script>
+<!--引入Game游戏对象-->
+<script src='./js/game.js'></script>
+<script>
+  var cv = document.getElementById("cv");
+  cv.width = 800;
+  cv.height = 600;
+  cv.style.border = '1px solid blue';
+  var context = cv.getContext('2d');
+  var isStart = true;
+  //封装角度转弧度函数
+  /*function toRadian(angle) {
+    return angle / 180  *Math.PI;
+  };*/
+
+  //图片加载顺序并不是按照123来的，无法知道加载顺序，这是异步事件
+  //封装一个函数，等到最后一张图片加载完了，再执行小鸟的代码
+  //定义图片资源数组,就是图片路径
+  var imgsArr = ['birds', 'land', 'pipe1', 'pipe2', 'sky'];
+
+  /*function loadImages(srcList, callback) {
+    //有一个变量记录加载完成的图片数量，只要有一个图片加载完成，就加1，如果这个数量与所有图片数量相同，就加载完成了
+    var count = 0;
+    var allLength = srcList.length;
+    //把图片存到这个对象中
+    var imgsObj = {};
+    srcList.forEach(function (src){
+      //创建图片对象
+      var img = new Image();
+      img.src = './images/' + src + '.png';
+    
+      imgsObj[src] = img;
+      img.onload = function () {
+        count++;
+        if(count >= allLength){
+          callback(imgsObj);
+        };
+      };
+    });
+  };*/
+  //调用
+  Fly.loadImages(imgsArr, function (imgsObj) {
+    //这个回调函数会在所有的图片加载完后立即执行
+    //console.log('所有图片加载完成');
+    //图片加载完成后，绘制图片
+    //需要先拿到上面函数中的图片对象,创建一个imgsObj存图片对象，再传给callback函数
+    //console.log(imgsObj);
+  
+    //------------------创建小鸟对象------------------
+    var bird = new Fly.Bird({
+      img: imgsObj.birds,
+      ctx: context
+    });
+    //------------------创建小鸟对象------------------
+    /*var birdImg = imgsObj.birds;
+    //console.log(birdImg);
+    var imgW = birdImg.width/3;
+    var imgH = birdImg.height;
+    //记录移动到哪一帧
+    var frameIndex = 0;
+    //实现小鸟下落，就是改变画布中的y值, 经过事件delta之后小鸟的位置,delta是两帧时间间隔
+    var x = 100;
+    var y = 100;
+    var a = 0.0005;
+    var speed = 0;*/
+    
+    //让小鸟旋转，速度越大旋转角度越大，速度越小旋转角度越小
+    /*var curAngle = 0;
+    var maxAngle = 45;
+    var maxSpeed = 0.3;*/
+  
+    var lastFrameTime = new Date();
+    var curFrameTime;
+    var delta = 0;
+    //求curAngle: curAngle/maxAngle = speed/maxSpeed; 每次绘制都要计算一次当前角度
+
+    //创建一个数组，存储游戏中所有的角色
+    var roles = [];
+
+    //画天空
+    /*var skyX = 0;
+    var skyY = 0;
+    var skySpeed = 0.1;
+    var skyImg = imgsObj.sky;*/
+    
+    //画第二张天空
+    //var sky1 = skyImg.width;
+    //----------------------创建天空对象----------------------
+
+    /*var sky1 = new Fly.Sky({
+      img: imgsObj.sky,
+      ctx: context,
+      x: 0
+    });
+    var sky2 = new Fly.Sky({
+      img: imgsObj.sky,
+      ctx: context,
+      x: imgsObj.sky.width
+    });*/
+
+    //代码改造
+    var imgSky = imgsObj.sky;
+    for(var i = 0; i < 2; i++){
+      var sky = new Fly.Sky({
+        img: imgSky,
+        ctx: context,
+        x: i * imgSky.width
+      });
+      roles.push(sky);
+    }
+    //----------------------创建天空对象----------------------
+    //------------------------------创建6组管道对象--------------------------------
+    for(var i = 0; i < 6; i++){
+      var pipe = new Fly.Pipe({
+        imgTop: imgsObj.pipe2,
+        imgBottom: imgsObj.pipe1,
+        ctx: context,
+        x: i * imgsObj.pipe1.width * 3 +200,
+        pipeSpace: 200
+      });
+      roles.push(pipe);
+    }
+    //------------------------------创建管道对象--------------------------------
+
+    //----------------------创建陆地对象----------------------
+    //要创建4个陆地对象
+    var imgLand = imgsObj.land;
+    for(var i = 0; i < 4; i++){
+      var land = new Fly.Land({
+        img: imgLand,
+        ctx: context,
+        x: i * imgLand.width,
+        y: imgSky.height - imgLand.height
+      });
+      //循环创建然后push到数组中
+      roles.push(land);
+    }
+    //----------------------创建陆地对象----------------------
+    (function render() {
+      context.save();
+      context.clearRect(0, 0, cv.width, cv.height);
+      
+      context.beginPath();
+
+      curFrameTime = new Date();
+      delta = curFrameTime - lastFrameTime;
+      lastFrameTime = curFrameTime;
+    
+      //先画天空，再画小鸟
+      //-------------------- 画天空开始 --------------------
+      //让天空向左走
+      /*skyX -= skySpeed * delta;
+      skyX1 -= skySpeed * delta;
+      if(skyX <= -skyImg.width){
+        skyX += skyImg.width * 2;
+      }
+      
+      if(skyX1 <= -skyImg.width){
+        skyX1 += skyImg.width * 2;
+      }
+      
+      context.drawImage(skyImg, skyX, skyY);
+      context.drawImage(skyImg, skyX1, skyY);*/
+
+//      sky1.draw(delta);
+//      sky2.draw(delta);
+      //-------------------- 画天空结束 --------------------
+
+      //绘制游戏中的角色
+      roles.forEach(function(value){
+        value.draw(delta);
+      });
+
+      //-------------------- 画小鸟 ---------------------
+      bird.draw(delta);
+      //-------------------- 画小鸟 ---------------------
+      //-------------------- 碰撞检测 ---------------------
+      //1. 小鸟超出最上边
+      //2. 小鸟与陆地碰撞
+      //3. 小鸟与管道碰撞
+      if(bird.y <= 10 || bird.y >= (imgSky.height - imgLand.height - 15) || context.isPointInPath(bird.x, bird.y)){
+        isStart = false;
+      }
+
+      
+
+      //-------------------- 碰撞检测 ---------------------
+
+      /*//用公式计算小鸟下降速度
+      speed = speed + a * delta;
+      y += speed * delta + 1/2*a*Math.pow(delta,2);
+      //计算当前角度
+      curAngle = speed/maxSpeed * maxAngle;
+      //给curAngle设定一个最大值和最小值，不让小鸟翻转
+      if(curAngle >= maxAngle){
+        curAngle = maxAngle;
+      }else if(curAngle <= -maxAngle) {
+        curAngle = -maxAngle;
+      };
+      //小鸟绕着自己转，需要先将圆心点坐标移到小鸟上
+      context.translate(x, y);
+      context.rotate(toRadian(curAngle));
+      //让小鸟位于圆心点中心
+      context.drawImage(birdImg, imgW * frameIndex++, 0, imgW, imgH, -1/2*imgW, -1/2*imgH, imgW, imgH);
+      if(frameIndex >= 3){
+        frameIndex = 0;
+      };*/
+      context.restore();
+      if(isStart){
+        requestAnimationFrame(render);
+      }
+      
+    })();
+    
+    cv.addEventListener('click', function () {
+      //bird.speed = -0.3;
+      bird.changeSpeed(-0.3);
+    });
+  
+  });
+  
+  
+  //拿到小鸟图片
+  var img = new Image();
+  img.src = './images/birds.png';
+  //图片加载需要时间，监听load事件
+  img.onload = function () {
+  
+  }
+</script>
+</body>
+</html>
